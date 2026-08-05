@@ -1,0 +1,61 @@
+name: seal-build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      NVM_DIR: ${{ github.workspace }}/.nvm
+      SEAL_REGISTRY: https://:2020-03-12T22%3A16%3A19.463Z@time-machines-npm.sealsecurity.io/
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nvm
+        run: |
+          mkdir -p "$NVM_DIR"
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+          . "$NVM_DIR/nvm.sh"
+          nvm --version
+
+      - name: Install dependencies on Node 13
+        run: |
+          . "$NVM_DIR/nvm.sh"
+          nvm install 13
+          nvm use 13
+          node --version
+          npm --version
+          npm config set registry "$SEAL_REGISTRY"
+          npm install
+
+      - name: Pack artifact (npm pack)
+        run: |
+          . "$NVM_DIR/nvm.sh"
+          nvm use 13
+          npm pack
+          ls -l minimist-1.2.5.tgz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: minimist-tgz
+          path: minimist-1.2.5.tgz
+          if-no-files-found: error
+
+      - name: Test suite on Node 13
+        run: |
+          . "$NVM_DIR/nvm.sh"
+          nvm use 13
+          node --version
+          node node_modules/.bin/tap test/*.js
+
+      - name: Test suite on legacy Node (0.12, 0.10, 0.8)
+        run: |
+          . "$NVM_DIR/nvm.sh"
+          for v in 0.12 0.10 0.8; do
+            echo "=== Node $v ==="
+            nvm install "$v"
+            nvm use "$v"
+            node --version
+            node node_modules/.bin/tap test/*.js
+          done
